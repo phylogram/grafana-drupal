@@ -1,0 +1,10 @@
+;$Id$
+name = Grafana User API
+description = This module maps Drupal Users to Grafana Users and provides a link.
+package = Grafana
+
+core = 7.x
+;php = 7.0
+files[] = grafanaApi.install
+files[] = grafanaApi.module
+; tests have to be added
