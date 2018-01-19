@@ -13,7 +13,7 @@
  *
  * Communicates with the Grafana User API
  *
- * An instance - an user
+ * An instance - an user (org with install)
  */
 interface GrafanaApiInterface {
 
@@ -57,4 +57,12 @@ interface GrafanaApiInterface {
    * @return mixed
    */
   public function getUserCredentials($type);
+
+  /**
+   * @param $orgName
+   *
+   * @return array response
+   */
+  public function createOrganisation($orgName);
+
 }

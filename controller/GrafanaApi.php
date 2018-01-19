@@ -5,7 +5,15 @@
  * Time: 3:07 PM
  */
 
-class GrafanaApi implements GrafanaApiInterface {
+require_once DRUPAL_ROOT . '/sites/default/modules/grafanaApi/grafanaApi.conf';
+
+class GrafanaApi{
+
+  protected $headers = [
+    'Accept'=> 'application/json',
+    'Content-type'=> 'application/json',
+  ];
+  public $basicAuthURL;
 
   /**
    * GrafanaApiInterface constructor.
@@ -14,7 +22,8 @@ class GrafanaApi implements GrafanaApiInterface {
    *   => $password}
    */
   public function __construct($userArray) {
-    parent::__construct($userArray);
+    $urlsplit = parse_url(GRAFANA_HOST);
+    $this->basicAuthURL = "{$urlsplit['scheme']}://{$userArray['name']}:{$userArray['password']}@{$urlsplit['host']}:{$urlsplit['port']}";
   }
 
   /**
@@ -63,5 +72,89 @@ class GrafanaApi implements GrafanaApiInterface {
   public function getUserCredentials($type) {
     // TODO: Implement getUserCredentials() method.
   }
+
+  /**
+   * @param $orgName string
+   *
+   * @return object response
+   */
+  public function createOrganisation($orgName) {
+
+    $data = ['name'=> $orgName];
+    $data = json_encode($data);
+    $url = $this->basicAuthURL . '/api/orgs';
+
+    $response = drupal_http_request($url,
+        array(
+          'headers' => $this->headers,
+          'method' => 'POST',
+          'data' => $data,
+          )
+      );
+    return $response;
+  }
+
+  /**
+   * @param $orgID
+   *
+   * @return object
+   */
+  public function setOrganisation($orgID) {
+
+    $url = $this->basicAuthURL . '/api/user/using/' . $orgID;
+    $response = drupal_http_request($url,
+        array(
+          'headers' => $this->headers,
+          'method' => 'POST',
+        )
+      );
+    return array($url, $response);
+  }
+
+  /**
+   * @param $data_source name
+   *
+   * @return object response
+   */
+  public function addDatasource($data_source) {
+    $data = array(
+      'name'=> $data_source, # $data_source // To Do!!!
+      'type'=> 'influxdb',
+      'access'=> 'proxy',
+      'url'=> INFLUX_HOST,
+      'password'=> GRAFANA_ADMIN_PASSWORD,
+      'user'=> GRAFANA_ADMIN_USERNAME,           # This will have to be https eventually!
+      'database'=> $data_source,
+      'basicAuth'=> FALSE,
+      'isDefault'=> TRUE,        # This is quite important - I want to define default as datasource in the dashboards.
+      );
+
+    $data = json_encode($data);
+    $url = $this->basicAuthURL . '/api/datasources';
+
+    $request = drupal_http_request($url,
+      array(
+        'headers' => $this->headers,
+        'method' => 'POST',
+        'data' => $data,
+        )
+      );
+    return $request;
+    }
+
+    public function addDashboard($dashboard) {
+      $data = json_encode($dashboard);
+      $url = $this->basicAuthURL . '/api/dashboards/db';
+      $request = drupal_http_request($url,
+        array(
+          'headers' => $this->headers,
+          'method' => 'POST',
+          'data' => $data,
+        )
+      );
+      return $request;
+    }
+
+
 
 }

@@ -5,7 +5,7 @@
  * Time: 3:13 PM
  */
 
-class Mapping implements MappingInterface{
+class Mapping {
 
   /**
    * Determines if Drupal User is already Grafana User by Drupal ID
@@ -111,6 +111,24 @@ class Mapping implements MappingInterface{
    */
   public function updateGrafanaURL($newUrl) {
     // TODO: Implement updateGrafanaURL() method.
+  }
+
+  /**
+   * @param $GrafanaOrg
+   * @param $GrafanaID
+   * @param $host
+   *
+   * @return \DatabaseStatementInterface|int
+   * @throws \Exception
+   */
+  public static function setOrg($GrafanaOrg, $GrafanaID, $host) {
+    $insert = db_insert('grafana_org');
+    $insert->fields(array(
+      'id' => $GrafanaID,
+      'host' =>  $host,
+      'grafana_org' => $GrafanaOrg,
+    ));
+    return $insert->execute();
   }
 
 }

@@ -3,4 +3,128 @@
  * User: phylogram
  * Date: 1/6/18
  * Time: 2:43 PM
+ *
+ * 1. Initialize custom tables
+ * 2. Create Organisation
  */
+
+require_once  DRUPAL_ROOT . '/sites/default/modules/grafanaApi/controller/GrafanaApi.php';
+require_once DRUPAL_ROOT . '/sites/default/modules/grafanaApi/grafanaApi.conf';
+require_once DRUPAL_ROOT . '/sites/default/modules/grafanaApi/model/InstallGrafanaApi.php';
+require_once DRUPAL_ROOT . '/sites/default/modules/grafanaApi/model/Mapping.php';
+
+# 1. Initialize custom tables
+echo 'dada';
+/**
+ * Implements hook_schema()
+ * @return array
+ */
+function grafanaApi_schema() {
+  $schema =   InstallGrafanaApi::makeTables();
+  return $schema;
+}
+
+
+function grafanaApi_install() {
+
+  # If Drupal is too fast, Grafana can't keep up
+  $sleep_between_api_calls = 0.3;
+  # 2. Connect to Grafana
+
+  $grafanaApi = new GrafanaApi(array(
+    'name' => GRAFANA_ADMIN_USERNAME,
+    'password' => GRAFANA_ADMIN_PASSWORD,
+  ));
+
+  $log = fopen('/home/phylogram/Desktop/tempLog', 'w');
+
+  global $base_root;
+  $urls_split = parse_url($base_root);
+  $host = $urls_split['host'];
+  $host = explode('.', $host);
+  $host = $host[0];
+  $response = $grafanaApi->createOrganisation($host);
+  sleep($sleep_between_api_calls);
+  $body = $response->data;
+  $json = json_decode($body);
+  fwrite($log, "(Create Org in Grafana:\n)");
+  fwrite($log, "\t" . $grafanaApi->basicAuthURL . "\n");
+  fwrite($log, var_export($body, true));
+  fwrite($log, "\n=============\n");
+  $org_id = $json->orgId;
+
+  # Create Org in drupal db
+  $response = Mapping::setOrg($host, $org_id, $host); # I will just call grafanas org like the host ...
+  fwrite($log, "(Create Org in Drupal:\n)");
+  fwrite($log, "\t" . $grafanaApi->basicAuthURL . "\n");
+  fwrite($log, var_export($response, true));
+  fwrite($log, "(\n=============\n)");
+  # Change to org
+  $response =  $grafanaApi->setOrganisation($org_id);
+  sleep($sleep_between_api_calls);
+  fwrite($log, "(Change Org in Grafana:\n)");
+  fwrite($log, "\t" . $grafanaApi->basicAuthURL . "\n");
+  fwrite($log, var_export($response, true));
+  fwrite($log, "(\n=============\n)");
+  # Set datasource for org
+  $response = $grafanaApi->addDatasource($host . '_DB');
+  sleep($sleep_between_api_calls);
+  fwrite($log, "(Set data source in Grafana:\n)");
+  fwrite($log, "\t" . $grafanaApi->basicAuthURL . "\n");
+  fwrite($log, var_export($response, true));
+  fwrite($log, "(\n=============\n)");
+  # Push dashboards
+
+  foreach (scandir(DRUPAL_ROOT . '/sites/default/modules/grafanaApi/dashboards/') as $dashboard_dir) {
+    if ($dashboard_dir[0] === '.') {
+      continue;
+    }
+
+    foreach (scandir(DRUPAL_ROOT . '/sites/default/modules/grafanaApi/dashboards/' . $dashboard_dir . '/dashboard/') as $dashboard_file) {
+      if ($dashboard_file[0] === '.') {
+        continue;
+      }
+      require_once DRUPAL_ROOT . '/sites/default/modules/grafanaApi/dashboards/' . $dashboard_dir . '/dashboard/' . $dashboard_file;
+    }
+
+    foreach (scandir(DRUPAL_ROOT . '/sites/default/modules/grafanaApi/dashboards/' . $dashboard_dir . '/rows/') as $row_file) {
+      if ($row_file[0] === '.') {
+        continue;
+      }
+
+      require_once DRUPAL_ROOT . '/sites/default/modules/grafanaApi/dashboards/' . $dashboard_dir . '/rows/' . $row_file;
+
+      # Row and templating will be poulated with foreach require_once
+
+      $title = explode('.', $row_file);
+      $title = $title[0];
+      $title = str_replace('_', ' ', $row_file);
+      $title = ucwords($title);
+      $dashboard_template['title'] = $title;
+
+      foreach ($rows as $row_number => $row) {
+        if (!array_key_exists('panels', $row)) {
+          continue;
+        }
+        $panels = $row['panels'];
+        foreach ($panels as $panel_number => $panel) {
+          $rows[$row_number]['panels'][$panel_number]['datasource'] = $host . '_DB';
+        }
+      }
+      $dashboard_template['rows'] = $rows;
+
+      foreach ($templating['list'] as $template_number => $template) {
+        $templating['list'][$template_number]['datasource'] = $host . '_DB';
+      }
+
+      $dashboard_template['templating'] = $templating;
+      $dashboard_request['dashboard'] = $dashboard_template;
+      $response = $grafanaApi->addDashboard($dashboard_request);
+      fwrite($log, "(Push $row_file to Grafana:\n)");
+      fwrite($log, "\t" . $grafanaApi->basicAuthURL . "\n");
+      fwrite($log, var_export($response, true));
+      fwrite($log, "(\n=============\n)");
+      sleep($sleep_between_api_calls);
+    }
+  }
+}
