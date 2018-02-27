@@ -1,7 +1,6 @@
 # grafana-drupal
 
 ## oauth2_server & Grafana Test
-**READ ME**
 ### Stack & Co
 - Grafana v4.6.3 (commit: 7a06a47)  → https
 - Drupal 7 (https://github.com/drupal-composer/drupal-project)
